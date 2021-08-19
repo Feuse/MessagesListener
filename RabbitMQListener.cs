@@ -54,7 +54,7 @@ namespace RabbitMQListenerService
                 //var credentials = await GetUserNamePassword(message);
                 
                 ///////////////////
-                var response = await service.AppStartUp(new Data() {UserName= "Feuse132@gmail.com", Password = "121233054a", Likes = message .Likes,XPing= "f71d4842782bd158dc92f78d3a9836c5" });
+                var response = await service.AppStartUp(new Data() {UserName= "x", Password = "x", Likes = message .Likes,XPing= "f71d4842782bd158dc92f78d3a9836c5" });
                 var parsedResponse = JsonConvert.DeserializeObject<dynamic>(response);
                 if (parsedResponse.session_id != null)
                 {
