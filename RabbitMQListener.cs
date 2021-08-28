@@ -51,14 +51,14 @@ namespace RabbitMQListenerService
                 IService service = _factory.GetService(message.Service);
 
                 //////////  WAITING FOR XPING SCRIPT  //////////
-                //var credentials = await GetUserNamePassword(message);
+                var credentials = await GetUserNamePassword(message);
                 
                 ///////////////////
-                var response = await service.AppStartUp(new Data() {UserName= "Feuse132@gmail.com", Password = "121233054a", Likes = message .Likes,XPing= "f71d4842782bd158dc92f78d3a9836c5" });
-                var parsedResponse = JsonConvert.DeserializeObject<dynamic>(response);
-                if (parsedResponse.session_id != null)
+                var response = await service.AppStartUp(new Data() {UserName= credentials.Username, Password = credentials.Password, Likes = message.Likes, XPing= "f71d4842782bd158dc92f78d3a9836c5" });
+                
+                if (response.Result == Result.Success)
                 {
-                    result = await service.Like(new Data() {SessionId = parsedResponse.session_id, UserId = parsedResponse.user_id ,Likes=message.Likes});
+                    result = await service.Like(new Data() {SessionId = response.SessionId, UserServiceId = response.UserServiceId ,Likes=message.Likes});
                     if (result > 0)
                     {
                         _channel.BasicNack(ea.DeliveryTag, false, true);
@@ -70,6 +70,7 @@ namespace RabbitMQListenerService
                 }
                 else
                 {
+                     await _data.RemoveServiceFromUser(new Data() { Id = message.UserId, Service = message.Service });
                     _channel.BasicNack(ea.DeliveryTag, false, true);
                 }
 
@@ -116,7 +117,7 @@ namespace RabbitMQListenerService
 
         public async Task<UserServiceCredentials> GetUserNamePassword(Message message)
         {
-            return await _data.GetById(message);
+            return await _data.GetUserServiceByServiceName(new Data() { Service=message.Service, Id = message.UserId});
         }
     }
 }
