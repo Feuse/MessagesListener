@@ -22,7 +22,7 @@ namespace RabbitMQListenerService.Installer
             //contextOptions.UseSqlServer("server=(localdb)\\MSSQLLocalDB;database=databasename;Trusted_Connection=true");
             //builder.RegisterInstance(contextOptions.Options).As<DbContextOptions<AppDbContext>>();
 
-            builder.RegisterType<DataAccess.DataAccess>().As<IDataAccess>();
+            builder.RegisterType<ServicesDataAccess>().As<IDataAccess>();
             // builder.RegisterType<IdentityDbContext>();
             //builder.RegisterType<AppDbContext>().InstancePerDependency();
 
@@ -48,7 +48,7 @@ namespace RabbitMQListenerService.Installer
             //                .As(typeof(ILogger<>))
             //                .SingleInstance();
 
-            builder.RegisterType<JsonFactory>().As<IJsonFactory>();
+            builder.RegisterType<JsonRequestBodyFactory>().As<IJsonFactory>();
             var instance = QuartzInstance.Instance;
             builder.RegisterType<QueueImpl>().AsImplementedInterfaces();
             builder.RegisterType<Scheduler>().AsImplementedInterfaces();
