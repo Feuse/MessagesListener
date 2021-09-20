@@ -13,25 +13,23 @@ using System.Threading.Tasks;
 
 namespace RabbitMQListenerService
 {
-    public class RabbitMQListener : IRabbitMQListener, IDisposable
+    public class RabbitMQListener : IListener, IDisposable
     {
-        private  IConnection _connection;
-        private  IModel _channel;
-        private readonly IServicesFactory _factory;
-        private readonly IScheduler _scheduler;
-        private readonly IDataAccess _data;
-
-        public RabbitMQListener(IServicesFactory factory, IScheduler scheduler)
+        private readonly IMessageRecievedEventHandler _handler;
+        private IConnection _connection;
+        private IModel _channel;
+        public RabbitMQListener(IMessageRecievedEventHandler handler)
         {
-            _factory = factory;
-            _scheduler = scheduler;
+            _handler = handler;
         }
+        public RabbitMQListener() { }
 
         public void StartListening()
         {
-            _connection = CreateConnection();
 
-            _channel = _connection.CreateModel();
+         //    _connection = CreateConnection();
+
+            _channel = _handler._channel;
 
             EventingBasicConsumer consumer = new EventingBasicConsumer(_channel);
 
@@ -40,50 +38,14 @@ namespace RabbitMQListenerService
                                  exclusive: false,
                                  autoDelete: false,
                                  arguments: null);
-            int result = 0;
-            consumer.Received += async (model, ea) =>
-            {
-                Console.WriteLine("waiting for queue");
-                var _body = ea.Body.ToArray();
-                var msg = Encoding.UTF8.GetString(_body);
-                var message = JsonConvert.DeserializeObject<Message>(msg);
 
-                IService service = _factory.GetService(message.Service);
+            consumer.Received += _handler.ConsumeMessage;
 
-                //////////  WAITING FOR XPING SCRIPT  //////////
-                var credentials = await GetUserNamePassword(message);
-                
-                ///////////////////
-                var response = await service.AppStartUp(new Data() {UserName= credentials.Username, Password = credentials.Password, Likes = message.Likes, XPing= "f71d4842782bd158dc92f78d3a9836c5" });
-                
-                if (response.Result == Result.Success)
-                {
-                    result = await service.Like(new Data() {SessionId = response.SessionId, UserServiceId = response.UserServiceId ,Likes=message.Likes});
-                    if (result > 0)
-                    {
-                        _channel.BasicNack(ea.DeliveryTag, false, true);
-                    }
-                    else
-                    {
-                        _channel.BasicAck(ea.DeliveryTag, false);
-                    }
-                }
-                else
-                {
-                     await _data.RemoveServiceFromUser(new Data() { Id = message.UserId, Service = message.Service });
-                    _channel.BasicNack(ea.DeliveryTag, false, true);
-                }
-
-            };
             _channel.BasicConsume(queue: "messages",
-                                                  autoAck: false,
+                                                 autoAck: false,
                                                  consumer: consumer);
-            Console.WriteLine("done1");
             Console.ReadLine();
-            Console.WriteLine("done2");
-
         }
-
         public IConnection CreateConnection()
         {
             var factory = new ConnectionFactory()
@@ -92,32 +54,14 @@ namespace RabbitMQListenerService
             };
             return factory.CreateConnection();
         }
+        public void Dispose()
+        {
+            //_connection.Dispose();
+            _channel.Dispose();
+        }
         ~RabbitMQListener()
         {
             Dispose();
-        }
-
-        public void Dispose()
-        {
-            _connection.Dispose();
-            _channel.Dispose();
-        }
-
-        public Message DeserializeJsonMesage(byte[] msg)
-        {
-            var message = Encoding.UTF8.GetString(msg);
-            return JsonConvert.DeserializeObject<Message>(message);
-        }
-
-        public byte[] SerializeMessage(Message msg)
-        {
-            var newJson = JsonConvert.SerializeObject(msg);
-            return Encoding.UTF8.GetBytes(newJson);
-        }
-
-        public async Task<UserServiceCredentials> GetUserNamePassword(Message message)
-        {
-            return await _data.GetUserServiceByServiceName(new Data() { Service=message.Service, Id = message.UserId});
         }
     }
 }

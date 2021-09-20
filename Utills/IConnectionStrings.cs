@@ -4,10 +4,10 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace RabbitMQListenerService.Interfaces
+namespace RabbitMQListenerService.Utills
 {
-    public interface IRabbitMQListener
+    public interface IConnectionStrings
     {
-        public void StartListening();
+        public string Redis { get; set; }
     }
 }

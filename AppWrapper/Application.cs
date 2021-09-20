@@ -8,9 +8,9 @@ namespace RabbitMQListenerService.AppWrapper
 {
     public class Application : IApplication
     {
-        private readonly IRabbitMQListener _queue;
+        private readonly IListener _queue;
 
-        public Application(IRabbitMQListener queue)
+        public Application(IListener queue)
         {
             _queue = queue;
 
