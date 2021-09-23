@@ -5,7 +5,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace RabbitMQListenerService.Utills
+namespace MessagesListener.Utills
 {
     public interface IConfig
     {

@@ -7,7 +7,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace RabbitMQListenerService.Utills
+namespace MessagesListener.Utills
 {
     public class ListenerJobFactory : IJobFactory
     {

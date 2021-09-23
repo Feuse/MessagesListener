@@ -4,7 +4,7 @@ using System;
 using System.Collections.Generic;
 using System.Text;
 
-namespace RabbitMQListenerService.AppWrapper
+namespace MessagesListener.AppWrapper
 {
     public class Application : IApplication
     {

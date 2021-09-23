@@ -2,7 +2,7 @@
 using System.Collections.Generic;
 using System.Text;
 
-namespace RabbitMQListenerService.AppWrapper
+namespace MessagesListener.AppWrapper
 {
     interface IApplication
     {

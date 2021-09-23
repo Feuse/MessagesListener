@@ -1,7 +1,6 @@
 ﻿using Newtonsoft.Json;
 using RabbitMQ.Client;
 using RabbitMQ.Client.Events;
-using RabbitMQScheduler.Models;
 using ServicesInterfaces;
 using ServicesModels;
 using System;
@@ -10,7 +9,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace RabbitMQListenerService.Utills
+namespace MessagesListener.Utills
 {
     public class RabbitMQEventHandler : IMessageRecievedEventHandler, IDisposable
     {
@@ -40,7 +39,7 @@ namespace RabbitMQListenerService.Utills
             var _body = ea.Body.ToArray();
             var msg = Encoding.UTF8.GetString(_body);
             var message = JsonConvert.DeserializeObject<Message>(msg);
-            Console.WriteLine("New message : "+ message.MessageId);
+            Console.WriteLine("New message : " + message.MessageId);
             IService service = _factory.GetService(message.Service);
 
             var credentials = await GetUserNamePassword(message);
@@ -50,28 +49,29 @@ namespace RabbitMQListenerService.Utills
             try
             {
 
-            if (response.Result == Result.Success)
-            {
-                int result = 0;
-                result = await service.Like(new Data() { SessionId = response.SessionId, UserServiceId = response.UserServiceId, Likes = message.Likes });
-                if (result > 0)
+                if (response.Result == Result.Success)
                 {
-                    _channel.BasicNack(ea.DeliveryTag, false, true);
+                    int result = 0;
+                    result = await service.Like(new Data() { SessionId = response.SessionId, UserServiceId = response.UserServiceId, Likes = message.Likes });
+                    if (result > 0)
+                    {
+                        // _channel.BasicNack(ea.DeliveryTag, true, true);
+                        _channel.BasicReject(ea.DeliveryTag, true);
+                    }
+                    else
+                    {
+                        _channel.BasicAck(ea.DeliveryTag, false);
+                    }
                 }
                 else
                 {
-                    _channel.BasicAck(ea.DeliveryTag, false);
+                    await _dataManager.RemoveServiceFromUser(new Data() { Id = message.UserId, Service = message.Service });
+                    _channel.BasicNack(ea.DeliveryTag, false, true);
                 }
             }
-            else
+            catch (Exception e)
             {
-                await _dataManager.RemoveServiceFromUser(new Data() { Id = message.UserId, Service = message.Service });
-                _channel.BasicNack(ea.DeliveryTag, false, true);
-            }
-            }
-            catch (Exception)
-            {
-               // _channel.BasicNack(ea.DeliveryTag, false, true);
+                _channel.BasicReject(ea.DeliveryTag, true);
             }
         }
 

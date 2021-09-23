@@ -3,13 +3,13 @@ using Divergic.Configuration.Autofac;
 using Microsoft.Extensions.Caching.Distributed;
 using Microsoft.Extensions.Caching.StackExchangeRedis;
 using Quartz;
-using RabbitMQListenerService.AppWrapper;
-using RabbitMQListenerService.Installer;
-using RabbitMQListenerService.Utills;
-using RabbitMQScheduler;
+using MessagesListener.AppWrapper;
+using MessagesListener.Installer;
+using MessagesListener.Utills;
+using Scheduler;
 using System;
 
-namespace RabbitMQListenerService
+namespace MessagesListener
 {
     public class Program
     {

@@ -1,8 +1,6 @@
 ﻿using Newtonsoft.Json;
 using RabbitMQ.Client;
 using RabbitMQ.Client.Events;
-using RabbitMQScheduler.Interfaces;
-using RabbitMQScheduler.Models;
 using ServicesInterfaces;
 using ServicesModels;
 using System;
@@ -11,12 +9,11 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace RabbitMQListenerService
+namespace MessagesListener
 {
     public class RabbitMQListener : IListener, IDisposable
     {
         private readonly IMessageRecievedEventHandler _handler;
-        private IConnection _connection;
         private IModel _channel;
         public RabbitMQListener(IMessageRecievedEventHandler handler)
         {
@@ -26,25 +23,27 @@ namespace RabbitMQListenerService
 
         public void StartListening()
         {
+           
+                _channel = _handler._channel;
 
-         //    _connection = CreateConnection();
+                EventingBasicConsumer consumer = new EventingBasicConsumer(_channel);
 
-            _channel = _handler._channel;
+                _channel.QueueDeclare(queue: "messages",
+                                     durable: false,
+                                     exclusive: false,
+                                     autoDelete: false,
+                                     arguments: null);
 
-            EventingBasicConsumer consumer = new EventingBasicConsumer(_channel);
+                consumer.Received += _handler.ConsumeMessage;
 
-            _channel.QueueDeclare(queue: "messages",
-                                 durable: false,
-                                 exclusive: false,
-                                 autoDelete: false,
-                                 arguments: null);
+                Console.WriteLine("recieved message");
 
-            consumer.Received += _handler.ConsumeMessage;
-
-            _channel.BasicConsume(queue: "messages",
-                                                 autoAck: false,
-                                                 consumer: consumer);
-            Console.ReadLine();
+                _channel.BasicConsume(queue: "messages",
+                                                     autoAck: false,
+                                                     consumer: consumer);
+                Console.ReadLine();
+            
+       
         }
         public IConnection CreateConnection()
         {

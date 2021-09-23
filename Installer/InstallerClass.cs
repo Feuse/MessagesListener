@@ -4,22 +4,21 @@ using BadooAPI.Factories;
 using BadooAPI.Interfaces;
 using DataAccess;
 using Divergic.Configuration.Autofac;
+using MessagesQueue;
 using Microsoft.Extensions.Caching.Distributed;
 using Microsoft.Extensions.Caching.StackExchangeRedis;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using RabbitMQ.Client;
-using RabbitMQListenerService.AppWrapper;
-using RabbitMQListenerService.Utills;
-using RabbitMQScheduler;
-
-using RabbitMQScheduler.ServicesImpl;
+using MessagesListener.AppWrapper;
+using MessagesListener.Utills;
+using Scheduler;
 using ServicesInterfaces;
 using System;
 using System.Configuration;
 
-namespace RabbitMQListenerService.Installer
+namespace MessagesListener.Installer
 {
     public class InstallerClass
     {
@@ -60,8 +59,8 @@ namespace RabbitMQListenerService.Installer
             builder.RegisterType<ServicesFactory>().As<IServicesFactory>();
             builder.RegisterType<JsonRequestBodyFactory>().As<IJsonFactory>();
             var instance = QuartzInstance.Instance;
-            builder.RegisterType<QueueImpl>().AsImplementedInterfaces();
-            builder.RegisterType<Scheduler>().AsImplementedInterfaces();
+            builder.RegisterType<Scheduler.Scheduler>().AsImplementedInterfaces();
+            builder.RegisterType<Queue>().AsImplementedInterfaces();
             builder.RegisterModule(new QuartzAutofacFactoryModule());
 
             return builder.Build();
