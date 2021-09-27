@@ -37,6 +37,7 @@
     <ProjectReference Include="..\DataAccess\DataAccess.csproj" />
     <ProjectReference Include="..\MessagesQueue\MessagesQueue.csproj" />
     <ProjectReference Include="..\Scheduler\Scheduler.csproj" />
+    <ProjectReference Include="..\Services.Server\Services.Server.csproj" />
     <ProjectReference Include="..\ServicesInterfaces\ServicesInterfaces.csproj" />
   </ItemGroup>
 

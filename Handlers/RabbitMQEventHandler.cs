@@ -2,6 +2,7 @@
 using RabbitMQ.Client;
 using RabbitMQ.Client.Events;
 using ServicesInterfaces;
+using ServicesInterfaces.Global;
 using ServicesModels;
 using System;
 using System.Collections.Generic;
@@ -14,24 +15,33 @@ namespace MessagesListener.Utills
     public class RabbitMQEventHandler : IMessageRecievedEventHandler, IDisposable
     {
         public IModel _channel { get; }
+        private readonly IAppSettings config;
         private IConnection _connection;
         private readonly IServicesFactory _factory;
         private readonly IDataAccessManager _dataManager;
+        private IList<AmqpTcpEndpoint> endpoints;
 
-        public RabbitMQEventHandler(IServicesFactory factory, IDataAccessManager data)
+        public RabbitMQEventHandler(IServicesFactory factory, IDataAccessManager data, IAppSettings _config)
         {
             _dataManager = data;
             _factory = factory;
+            config = _config;
+            InitAmqp();
             _connection = CreateConnection();
             _channel = _connection.CreateModel();
         }
+        public void InitAmqp()
+        {
+            endpoints = new List<AmqpTcpEndpoint>();
+            foreach (var port in config.QueuePorts)
+            {
+                endpoints.Add(new AmqpTcpEndpoint(config.HostName, port));
+            }
+        }
         public IConnection CreateConnection()
         {
-            var factory = new ConnectionFactory()
-            {
-                HostName = "localhost"
-            };
-            return factory.CreateConnection();
+            var factory = new ConnectionFactory();
+            return factory.CreateConnection(endpoints);
         }
 
         public async void ConsumeMessage(object model, BasicDeliverEventArgs ea)
@@ -44,7 +54,7 @@ namespace MessagesListener.Utills
 
             var credentials = await GetUserNamePassword(message);
 
-            var response = await service.AppStartUp(new Data() { UserName = credentials.Username, Password = credentials.Password, Likes = message.Likes });
+            var response = await service.AppStartUp(new Data() { Username = credentials.Username, Password = credentials.Password, Likes = message.Likes });
 
             try
             {

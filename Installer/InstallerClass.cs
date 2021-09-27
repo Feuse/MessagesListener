@@ -1,7 +1,6 @@
 ﻿using Autofac;
 using Autofac.Extras.Quartz;
 using BadooAPI.Factories;
-using BadooAPI.Interfaces;
 using DataAccess;
 using Divergic.Configuration.Autofac;
 using MessagesQueue;
@@ -17,44 +16,38 @@ using Scheduler;
 using ServicesInterfaces;
 using System;
 using System.Configuration;
+using System.Collections.Specialized;
+using Services.Server.Utills;
+using ServicesInterfaces.Global;
 
 namespace MessagesListener.Installer
 {
     public class InstallerClass
     {
-        public static IConnection CreateConnection()
-        {
-            var factory = new ConnectionFactory()
-            {
-                HostName = "localhost"
-            };
-            return factory.CreateConnection();
-        }
+
         public static IContainer Startup()
         {
-           var _connection = CreateConnection();
-
-            var _channel = _connection.CreateModel();
-
+   
             var builder = new ContainerBuilder();
+            var confBuilder = GetSettingsFromFile();
+            
+            RedisCacheOptions options = new RedisCacheOptions() { Configuration = confBuilder.Item1.GetConnectionString("Redis") };
 
-            var confBuilder = new ConfigurationBuilder()
-                //what will be the current directory on production server?
-           .SetBasePath(Environment.CurrentDirectory)
-           .AddJsonFile("appsettings.json", optional: true, reloadOnChange: true).Build();
+            var settings = confBuilder.Item1.GetSection(typeof(AppSettings).Name).Get<AppSettings>();
 
-            RedisCacheOptions options = new RedisCacheOptions() { Configuration = confBuilder.GetConnectionString("Redis") };
+            builder.Register(c => settings).As<IAppSettings>();
 
             builder.RegisterModule<ConfigurationModule<JsonResolver<Config>>>();
-            
+            builder.RegisterType<ServicesFactory>().As<IServicesFactory>();
+
             builder.Register(ctx => new RedisCache(options)).As<IDistributedCache>();
             builder.RegisterType<DataAccessManager>().As<IDataAccessManager>();
             builder.RegisterType<ServicesDataAccess>().As<IDataAccess>();
             builder.RegisterType<ServicesDataAccessCache>().As<ICacheDataAccess>();
-           
+
             builder.RegisterType<Application>().As<IApplication>();
             builder.RegisterType<RabbitMQListener>().As<IListener>().InstancePerDependency();
-            
+
             builder.RegisterType<RabbitMQEventHandler>().As<IMessageRecievedEventHandler>();
             builder.RegisterType<ServicesFactory>().As<IServicesFactory>();
             builder.RegisterType<JsonRequestBodyFactory>().As<IJsonFactory>();
@@ -64,6 +57,23 @@ namespace MessagesListener.Installer
             builder.RegisterModule(new QuartzAutofacFactoryModule());
 
             return builder.Build();
+        }
+
+        private static (IConfigurationRoot, NameValueCollection) GetSettingsFromFile()
+        {
+            var confBuilder = new ConfigurationBuilder()
+                       //what will be the current directory on production server?
+                       .SetBasePath(Environment.CurrentDirectory)
+                       .AddJsonFile("appsettings.json", optional: true, reloadOnChange: true).Build();
+
+            var values = confBuilder.GetSection("QuartzSettings").GetChildren();
+            NameValueCollection collection = new NameValueCollection();
+            foreach (var item in values)
+            {
+                collection.Add(item.Key, item.Value);
+            }
+
+            return (confBuilder,collection);
         }
     }
 }

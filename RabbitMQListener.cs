@@ -2,6 +2,7 @@
 using RabbitMQ.Client;
 using RabbitMQ.Client.Events;
 using ServicesInterfaces;
+using ServicesInterfaces.Global;
 using ServicesModels;
 using System;
 using System.Collections.Generic;
@@ -14,21 +15,23 @@ namespace MessagesListener
     public class RabbitMQListener : IListener, IDisposable
     {
         private readonly IMessageRecievedEventHandler _handler;
+        private readonly IAppSettings _settings;
         private IModel _channel;
-        public RabbitMQListener(IMessageRecievedEventHandler handler)
+        public RabbitMQListener(IMessageRecievedEventHandler handler, IAppSettings settings)
         {
             _handler = handler;
+            _settings = settings;
         }
         public RabbitMQListener() { }
 
+
         public void StartListening()
         {
-           
                 _channel = _handler._channel;
 
                 EventingBasicConsumer consumer = new EventingBasicConsumer(_channel);
 
-                _channel.QueueDeclare(queue: "messages",
+                _channel.QueueDeclare(queue: _settings.Queue,
                                      durable: false,
                                      exclusive: false,
                                      autoDelete: false,
@@ -38,7 +41,7 @@ namespace MessagesListener
 
                 Console.WriteLine("recieved message");
 
-                _channel.BasicConsume(queue: "messages",
+                _channel.BasicConsume(queue: _settings.Queue,
                                                      autoAck: false,
                                                      consumer: consumer);
                 Console.ReadLine();
@@ -49,7 +52,7 @@ namespace MessagesListener
         {
             var factory = new ConnectionFactory()
             {
-                HostName = "localhost"
+                HostName = _settings.HostName
             };
             return factory.CreateConnection();
         }

@@ -1,4 +1,6 @@
 ﻿using DataAccess;
+using DataAccess.Utills;
+using Services.Server.Utills;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -9,7 +11,7 @@ namespace MessagesListener.Utills
 {
     public interface IConfig
     {
-        AutoLoverDatabaseSettings AutoLoverDatabaseSettings { get; }
+        AppSettings AutoLoverDatabaseSettings { get; }
         ConnectionStrings ConnectionStrings { get; }
     }
 }

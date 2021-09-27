@@ -8,6 +8,7 @@ using MessagesListener.Installer;
 using MessagesListener.Utills;
 using Scheduler;
 using System;
+using Services.Server.Utills;
 
 namespace MessagesListener
 {
