@@ -19,8 +19,7 @@ namespace MessagesListener
             var container = InstallerClass.Startup();
             using (var scope = container.BeginLifetimeScope())
             {
-                var configuration = container.Resolve<Config>();
-               
+
                 var app = scope.Resolve<IApplication>();
                 var _scheduler = container.Resolve<IScheduler>();
                 _scheduler.JobFactory = new ListenerJobFactory(container);

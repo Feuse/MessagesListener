@@ -32,12 +32,12 @@ namespace MessagesListener.Installer
             var confBuilder = GetSettingsFromFile();
             
             RedisCacheOptions options = new RedisCacheOptions() { Configuration = confBuilder.Item1.GetConnectionString("Redis") };
-
-            var settings = confBuilder.Item1.GetSection(typeof(AppSettings).Name).Get<AppSettings>();
+            var x = typeof(Utills.AppSettings);
+            var settings = confBuilder.Item1.GetSection(typeof(Utills.AppSettings).Name).Get<Utills.AppSettings>();
 
             builder.Register(c => settings).As<IAppSettings>();
-
-            builder.RegisterModule<ConfigurationModule<JsonResolver<Config>>>();
+            builder.RegisterModule(new AutoMapperModule());
+            // builder.RegisterModule<ConfigurationModule<JsonResolver<Config>>>();
             builder.RegisterType<ServicesFactory>().As<IServicesFactory>();
 
             builder.Register(ctx => new RedisCache(options)).As<IDistributedCache>();
