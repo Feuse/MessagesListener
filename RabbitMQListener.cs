@@ -1,4 +1,5 @@
-﻿using Newtonsoft.Json;
+﻿using Microsoft.Extensions.Logging;
+using Newtonsoft.Json;
 using RabbitMQ.Client;
 using RabbitMQ.Client.Events;
 using ServicesInterfaces;
@@ -14,19 +15,23 @@ namespace MessagesListener
 {
     public class RabbitMQListener : IListener, IDisposable
     {
+        private readonly ILogger<RabbitMQListener> _logger;
         private readonly IMessageRecievedEventHandler _handler;
         private readonly IAppSettings _settings;
         private IModel _channel;
-        public RabbitMQListener(IMessageRecievedEventHandler handler, IAppSettings settings)
+        public RabbitMQListener(IMessageRecievedEventHandler handler, IAppSettings settings, ILogger<RabbitMQListener> logger)
         {
             _handler = handler;
             _settings = settings;
+            _logger = logger;
         }
         public RabbitMQListener() { }
 
 
         public void StartListening()
         {
+            try
+            {
                 _channel = _handler._channel;
 
                 EventingBasicConsumer consumer = new EventingBasicConsumer(_channel);
@@ -45,17 +50,17 @@ namespace MessagesListener
                                                      autoAck: false,
                                                      consumer: consumer);
                 Console.ReadLine();
+            }
+            catch (Exception e)
+            {
+                _logger.LogError(e.Message);
+                _logger.LogTrace(e.StackTrace);
+                throw;
+            }
             
        
         }
-        public IConnection CreateConnection()
-        {
-            var factory = new ConnectionFactory()
-            {
-                HostName = _settings.HostName
-            };
-            return factory.CreateConnection();
-        }
+
         public void Dispose()
         {
             //_connection.Dispose();

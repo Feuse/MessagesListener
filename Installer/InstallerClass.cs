@@ -19,6 +19,7 @@ using System.Configuration;
 using System.Collections.Specialized;
 using Services.Server.Utills;
 using ServicesInterfaces.Global;
+using Autofac.Extras.NLog;
 
 namespace MessagesListener.Installer
 {
@@ -27,10 +28,16 @@ namespace MessagesListener.Installer
 
         public static IContainer Startup()
         {
-   
+
             var builder = new ContainerBuilder();
             var confBuilder = GetSettingsFromFile();
-            
+            builder.RegisterType<LoggerFactory>()
+    .As<ILoggerFactory>()
+    .SingleInstance();
+            builder.RegisterGeneric(typeof(Logger<>))
+                .As(typeof(ILogger<>))
+                .SingleInstance();
+
             RedisCacheOptions options = new RedisCacheOptions() { Configuration = confBuilder.Item1.GetConnectionString("Redis") };
             var x = typeof(Utills.AppSettings);
             var settings = confBuilder.Item1.GetSection(typeof(Utills.AppSettings).Name).Get<Utills.AppSettings>();
@@ -49,7 +56,7 @@ namespace MessagesListener.Installer
             builder.RegisterType<RabbitMQListener>().As<IListener>().InstancePerDependency();
 
             builder.RegisterType<RabbitMQEventHandler>().As<IMessageRecievedEventHandler>();
-            builder.RegisterType<ServicesFactory>().As<IServicesFactory>();
+            //builder.RegisterType<ServicesFactory>().As<IServicesFactory>();
             builder.RegisterType<JsonRequestBodyFactory>().As<IJsonFactory>();
             var instance = QuartzInstance.Instance;
             builder.RegisterType<Scheduler.Scheduler>().AsImplementedInterfaces();
@@ -73,7 +80,7 @@ namespace MessagesListener.Installer
                 collection.Add(item.Key, item.Value);
             }
 
-            return (confBuilder,collection);
+            return (confBuilder, collection);
         }
     }
 }

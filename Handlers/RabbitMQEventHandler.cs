@@ -1,4 +1,7 @@
-﻿using Newtonsoft.Json;
+﻿
+using Microsoft.Extensions.Logging;
+using Newtonsoft.Json;
+using NLog;
 using RabbitMQ.Client;
 using RabbitMQ.Client.Events;
 using ServicesInterfaces;
@@ -14,6 +17,7 @@ namespace MessagesListener.Utills
 {
     public class RabbitMQEventHandler : IMessageRecievedEventHandler, IDisposable
     {
+        private readonly ILogger<RabbitMQEventHandler> _logger;
         public IModel _channel { get; }
         private readonly IAppSettings config;
         private IConnection _connection;
@@ -21,8 +25,9 @@ namespace MessagesListener.Utills
         private readonly IDataAccessManager _dataManager;
         private IList<AmqpTcpEndpoint> endpoints;
 
-        public RabbitMQEventHandler(IServicesFactory factory, IDataAccessManager data, IAppSettings _config)
+        public RabbitMQEventHandler(IServicesFactory factory, IDataAccessManager data, IAppSettings _config, ILogger<RabbitMQEventHandler> logger)
         {
+            _logger = logger;
             _dataManager = data;
             _factory = factory;
             config = _config;
@@ -32,32 +37,49 @@ namespace MessagesListener.Utills
         }
         public void InitAmqp()
         {
-            endpoints = new List<AmqpTcpEndpoint>();
-            foreach (var port in config.QueuePorts)
+            try
             {
-                endpoints.Add(new AmqpTcpEndpoint(config.HostName, port));
+                endpoints = new List<AmqpTcpEndpoint>();
+                foreach (var port in config.QueuePorts)
+                {
+                    endpoints.Add(new AmqpTcpEndpoint(config.HostName, port));
+                }
+            }
+            catch (Exception e)
+            {
+                _logger.LogError(e.Message);
+                _logger.LogTrace(e.StackTrace);
             }
         }
         public IConnection CreateConnection()
         {
-            var factory = new ConnectionFactory();
-            return factory.CreateConnection(endpoints);
+            try
+            {
+                var factory = new ConnectionFactory();
+                return factory.CreateConnection(endpoints);
+            }
+            catch (Exception e)
+            {
+                _logger.LogError(e.Message);
+                _logger.LogTrace(e.StackTrace);
+                throw;
+            }
         }
 
         public async void ConsumeMessage(object model, BasicDeliverEventArgs ea)
         {
-            var _body = ea.Body.ToArray();
-            var msg = Encoding.UTF8.GetString(_body);
-            var message = JsonConvert.DeserializeObject<Message>(msg);
-            Console.WriteLine("New message : " + message.MessageId);
-            IService service = _factory.GetService(message.Service);
-
-            var credentials = await GetUserNamePassword(message);
-
-            var response = await service.AppStartUp(new Data() { Username = credentials.Username, Password = credentials.Password, Likes = message.Likes });
-
             try
             {
+                var _body = ea.Body.ToArray();
+                var msg = Encoding.UTF8.GetString(_body);
+                var message = JsonConvert.DeserializeObject<Message>(msg);
+                Console.WriteLine("New message : " + message.MessageId);
+                IService service = _factory.GetService(message.Service);
+
+                var credentials = await GetUserNamePassword(message);
+
+                var response = await service.AppStartUp(new Data() { Username = credentials.Username, Password = credentials.Password, Likes = message.Likes });
+
 
                 if (response.Result == Result.Success)
                 {
@@ -82,6 +104,8 @@ namespace MessagesListener.Utills
             catch (Exception e)
             {
                 _channel.BasicReject(ea.DeliveryTag, true);
+                _logger.LogError(e.Message);
+                _logger.LogTrace(e.StackTrace);
             }
         }
 
