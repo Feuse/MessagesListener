@@ -8,17 +8,16 @@ namespace MessagesListener.AppWrapper
 {
     public class Application : IApplication
     {
-        private readonly IListener _queue;
+        private readonly IListener _listener;
 
-        public Application(IListener queue)
+        public Application(IListener listener)
         {
-            _queue = queue;
+            _listener = listener;
 
         }
-
         public void Run()
         {
-            _queue.StartListening();
+            _listener.StartListening();
         }
     }
 }

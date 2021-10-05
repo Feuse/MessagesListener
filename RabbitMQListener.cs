@@ -15,25 +15,55 @@ namespace MessagesListener
 {
     public class RabbitMQListener : IListener, IDisposable
     {
-        private readonly ILogger<RabbitMQListener> _logger;
-        private readonly IMessageRecievedEventHandler _handler;
+        public readonly IModel _channel;
+        public event Action<string> Message;
         private readonly IAppSettings _settings;
-        private IModel _channel;
-        public RabbitMQListener(IMessageRecievedEventHandler handler, IAppSettings settings, ILogger<RabbitMQListener> logger)
+        private readonly IConnection _connection;
+        private IList<AmqpTcpEndpoint> endpoints;
+        private readonly ILogger<RabbitMQListener> _logger;
+
+        public RabbitMQListener(IAppSettings settings, ILogger<RabbitMQListener> logger)
         {
-            _handler = handler;
-            _settings = settings;
             _logger = logger;
+            _settings = settings;
+             InitAmqp();
+            _connection = CreateConnection();
+            _channel = _connection.CreateModel();
         }
-        public RabbitMQListener() { }
-
-
+        public void InitAmqp()
+        {
+            try
+            {
+                endpoints = new List<AmqpTcpEndpoint>();
+                foreach (var port in _settings.QueuePorts)
+                {
+                    endpoints.Add(new AmqpTcpEndpoint(_settings.HostName, port));
+                }
+            }
+            catch (Exception e)
+            {
+                _logger.LogError(e.Message);
+                _logger.LogTrace(e.StackTrace);
+            }
+        }
+        public IConnection CreateConnection()
+        {
+            try
+            {
+                var factory = new ConnectionFactory() { Uri = new Uri(_settings.AMQP_URL) };
+                return factory.CreateConnection();
+            }
+            catch (Exception e)
+            {
+                _logger.LogError(e.Message);
+                _logger.LogTrace(e.StackTrace);
+                throw;
+            }
+        }
         public void StartListening()
         {
             try
             {
-                _channel = _handler._channel;
-
                 EventingBasicConsumer consumer = new EventingBasicConsumer(_channel);
 
                 _channel.QueueDeclare(queue: _settings.Queue,
@@ -41,8 +71,15 @@ namespace MessagesListener
                                      exclusive: false,
                                      autoDelete: false,
                                      arguments: null);
+                consumer.Received += (obj, ea) =>
+                {
+                    var _body = ea.Body.ToArray();
+                    var msg = Encoding.UTF8.GetString(_body);
 
-                consumer.Received += _handler.ConsumeMessage;
+                    Message?.Invoke(msg);
+
+                    _channel.BasicAck(ea.DeliveryTag, true);
+                };
 
                 Console.WriteLine("recieved message");
 
@@ -57,15 +94,13 @@ namespace MessagesListener
                 _logger.LogTrace(e.StackTrace);
                 throw;
             }
-            
-       
         }
-
         public void Dispose()
         {
-            //_connection.Dispose();
+            _connection.Dispose();
             _channel.Dispose();
         }
+
         ~RabbitMQListener()
         {
             Dispose();

@@ -20,6 +20,9 @@ using System.Collections.Specialized;
 using Services.Server.Utills;
 using ServicesInterfaces.Global;
 using Autofac.Extras.NLog;
+using ServicesInterfaces.DataAccess;
+using DataAccess.Cache;
+using ServicesInterfaces.DataAccess.Cache;
 
 namespace MessagesListener.Installer
 {
@@ -28,40 +31,61 @@ namespace MessagesListener.Installer
 
         public static IContainer Startup()
         {
-
             var builder = new ContainerBuilder();
             var confBuilder = GetSettingsFromFile();
+
+            #region Loggers
             builder.RegisterType<LoggerFactory>()
-    .As<ILoggerFactory>()
-    .SingleInstance();
+                   .As<ILoggerFactory>()
+                   .SingleInstance();
+
             builder.RegisterGeneric(typeof(Logger<>))
                 .As(typeof(ILogger<>))
                 .SingleInstance();
+            #endregion
 
-            RedisCacheOptions options = new RedisCacheOptions() { Configuration = confBuilder.Item1.GetConnectionString("Redis") };
-            var x = typeof(Utills.AppSettings);
+            #region Configuration File
             var settings = confBuilder.Item1.GetSection(typeof(Utills.AppSettings).Name).Get<Utills.AppSettings>();
-
             builder.Register(c => settings).As<IAppSettings>();
-            builder.RegisterModule(new AutoMapperModule());
-            // builder.RegisterModule<ConfigurationModule<JsonResolver<Config>>>();
-            builder.RegisterType<ServicesFactory>().As<IServicesFactory>();
+            #endregion
 
+            #region Loggers
+            RedisCacheOptions options = new RedisCacheOptions() { Configuration = confBuilder.Item1.GetConnectionString("Redis") };
             builder.Register(ctx => new RedisCache(options)).As<IDistributedCache>();
+            #endregion
+
+            #region Repositories
+            var cacheOptions = new DistributedCacheEntryOptions()
+                   .SetAbsoluteExpiration(TimeSpan.FromSeconds(60));
+            builder.Register(c => cacheOptions).As<DistributedCacheEntryOptions>();
             builder.RegisterType<DataAccessManager>().As<IDataAccessManager>();
-            builder.RegisterType<ServicesDataAccess>().As<IDataAccess>();
-            builder.RegisterType<ServicesDataAccessCache>().As<ICacheDataAccess>();
+            builder.RegisterType<ServicesDataAccess>().As<IServiceDataAccess>();
+            builder.RegisterType<UserDataAccess>().As<IUserDataAccess>();
+            builder.RegisterType<ServicesCacheAccess>().As<IServiceCacheAccess>();
+            builder.RegisterType<UserCacheAccess>().As<IUserCacheAccess>();
+            #endregion
 
-            builder.RegisterType<Application>().As<IApplication>();
-            builder.RegisterType<RabbitMQListener>().As<IListener>().InstancePerDependency();
-
-            builder.RegisterType<RabbitMQEventHandler>().As<IMessageRecievedEventHandler>();
-            //builder.RegisterType<ServicesFactory>().As<IServicesFactory>();
+            #region Services
+            builder.RegisterType<ServicesFactory>().As<IServicesFactory>();
             builder.RegisterType<JsonRequestBodyFactory>().As<IJsonFactory>();
+            #endregion
+
+            #region Queue Listeners
+            builder.RegisterType<RabbitMQListener>().As<IListener>().SingleInstance();
+            builder.RegisterType<RabbitMQEventHandler>().As<IMessageRecievedEventHandler>();
+            builder.RegisterType<Queue>().AsImplementedInterfaces();
+            #endregion
+
+            #region Schedulers
             var instance = QuartzInstance.Instance;
             builder.RegisterType<Scheduler.Scheduler>().AsImplementedInterfaces();
-            builder.RegisterType<Queue>().AsImplementedInterfaces();
             builder.RegisterModule(new QuartzAutofacFactoryModule());
+            #endregion
+
+            #region Utills
+            builder.RegisterModule(new AutoMapperModule());
+            builder.RegisterType<Application>().As<IApplication>();
+            #endregion
 
             return builder.Build();
         }
@@ -71,7 +95,7 @@ namespace MessagesListener.Installer
             var confBuilder = new ConfigurationBuilder()
                        //what will be the current directory on production server?
                        .SetBasePath(Environment.CurrentDirectory)
-                       .AddJsonFile("appsettings.json", optional: true, reloadOnChange: true).Build();
+                       .AddJsonFile(@"C:\Users\Feuse135\source\repos\Services.Server\appsettings.json", optional: true, reloadOnChange: true).Build();
 
             var values = confBuilder.GetSection("QuartzSettings").GetChildren();
             NameValueCollection collection = new NameValueCollection();

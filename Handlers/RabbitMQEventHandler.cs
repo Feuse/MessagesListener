@@ -6,7 +6,9 @@ using RabbitMQ.Client;
 using RabbitMQ.Client.Events;
 using ServicesInterfaces;
 using ServicesInterfaces.Global;
+using ServicesInterfaces.Scheduler;
 using ServicesModels;
+using ServicesModels.BadooAPI;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -15,64 +17,34 @@ using System.Threading.Tasks;
 
 namespace MessagesListener.Utills
 {
-    public class RabbitMQEventHandler : IMessageRecievedEventHandler, IDisposable
+    public class RabbitMQEventHandler : IMessageRecievedEventHandler
     {
+        private readonly IListener _listener;
         private readonly ILogger<RabbitMQEventHandler> _logger;
-        public IModel _channel { get; }
-        private readonly IAppSettings config;
-        private IConnection _connection;
         private readonly IServicesFactory _factory;
         private readonly IDataAccessManager _dataManager;
-        private IList<AmqpTcpEndpoint> endpoints;
-
-        public RabbitMQEventHandler(IServicesFactory factory, IDataAccessManager data, IAppSettings _config, ILogger<RabbitMQEventHandler> logger)
+        private readonly IQueue _queue;
+        public RabbitMQEventHandler(IServicesFactory factory, IDataAccessManager data, IAppSettings _config, ILogger<RabbitMQEventHandler> logger, IQueue queue, IListener listener)
         {
             _logger = logger;
             _dataManager = data;
             _factory = factory;
-            config = _config;
-            InitAmqp();
-            _connection = CreateConnection();
-            _channel = _connection.CreateModel();
-        }
-        public void InitAmqp()
-        {
-            try
-            {
-                endpoints = new List<AmqpTcpEndpoint>();
-                foreach (var port in config.QueuePorts)
-                {
-                    endpoints.Add(new AmqpTcpEndpoint(config.HostName, port));
-                }
-            }
-            catch (Exception e)
-            {
-                _logger.LogError(e.Message);
-                _logger.LogTrace(e.StackTrace);
-            }
-        }
-        public IConnection CreateConnection()
-        {
-            try
-            {
-                var factory = new ConnectionFactory();
-                return factory.CreateConnection(endpoints);
-            }
-            catch (Exception e)
-            {
-                _logger.LogError(e.Message);
-                _logger.LogTrace(e.StackTrace);
-                throw;
-            }
+            _queue = queue;
+            _listener = listener;
         }
 
-        public async void ConsumeMessage(object model, BasicDeliverEventArgs ea)
+        public void RegisterToQueueEvent()
         {
+            // RabbitMQListener listener = new RabbitMQListener();
+            _listener.Message += ProccessMessage;
+        }
+
+        protected async void ProccessMessage(string msg)
+        {
+            Message message = default;
             try
             {
-                var _body = ea.Body.ToArray();
-                var msg = Encoding.UTF8.GetString(_body);
-                var message = JsonConvert.DeserializeObject<Message>(msg);
+                message = JsonConvert.DeserializeObject<Message>(msg);
                 Console.WriteLine("New message : " + message.MessageId);
                 IService service = _factory.GetService(message.Service);
 
@@ -80,43 +52,30 @@ namespace MessagesListener.Utills
 
                 var response = await service.AppStartUp(new Data() { Username = credentials.Username, Password = credentials.Password, Likes = message.Likes });
 
-
                 if (response.Result == Result.Success)
                 {
-                    int result = 0;
-                    result = await service.Like(new Data() { SessionId = response.SessionId, UserServiceId = response.UserServiceId, Likes = message.Likes });
-                    if (result > 0)
+                    var result = await service.Like(new Data() { SessionId = response.SessionId, UserServiceId = response.UserServiceId, Likes = message.Likes });
+                    if (!result.IsComplete)
                     {
-                        // _channel.BasicNack(ea.DeliveryTag, true, true);
-                        _channel.BasicReject(ea.DeliveryTag, true);
-                    }
-                    else
-                    {
-                        _channel.BasicAck(ea.DeliveryTag, false);
+                        message.Likes = result.LikesLeft;
+                        _queue.QueueMessage(message);
                     }
                 }
                 else
                 {
                     await _dataManager.RemoveServiceFromUser(new Data() { Id = message.UserId, Service = message.Service });
-                    _channel.BasicNack(ea.DeliveryTag, false, true);
+                    _queue.QueueMessage(message);
                 }
             }
-            catch (Exception e)
+            catch (Exception es)
             {
-                _channel.BasicReject(ea.DeliveryTag, true);
-                _logger.LogError(e.Message);
-                _logger.LogTrace(e.StackTrace);
+                _logger.LogError(es.Message);
+                _logger.LogTrace(es.StackTrace);
+                if (message != null)
+                {
+                    _queue.QueueMessage(message);
+                }
             }
-        }
-
-        public void Dispose()
-        {
-            _channel.Dispose();
-            _connection.Dispose();
-        }
-        ~RabbitMQEventHandler()
-        {
-            Dispose();
         }
 
         public Message DeserializeJsonMesage(byte[] msg)
